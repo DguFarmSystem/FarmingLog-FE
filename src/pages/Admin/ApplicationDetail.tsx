@@ -1,14 +1,18 @@
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchApplicationDetail } from "../../services/applicationDetail";
-import { Application, Answer } from "../../types/application";
+import { Application, Answer, ApplyQuestion } from "../../types/application";
 import { useEffect, useState } from "react";
 import apiConfig from "../../config/apiConfig";
 
+export const sortQuestionsByPriority = (
+  questions: ApplyQuestion[]
+): ApplyQuestion[] => {
+  return questions.slice().sort((a, b) => a.priority - b.priority);
+};
+
 const ApplicationDetail = () => {
-  const [questionData, setQuestionData] = useState<
-    { questionId: number; content: string; choices?: { choiceId: number; content: string }[] }[]
-  >([]);
+  const [questionData, setQuestionData] = useState<ApplyQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,12 +26,13 @@ const ApplicationDetail = () => {
     enabled: !!applicationId, 
   });
 
-  // 질문 목록 가져오기(일단 확인차 여기에 넣어놨습니다... 나중에 분리 필요)
+  // 질문 목록 가져오기 (priority 기준으로 정렬)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await apiConfig.get("/apply"); 
-        setQuestionData(res.data.data); 
+        const res = await apiConfig.get("/apply");
+        const sortedQuestions = sortQuestionsByPriority(res.data.data);
+        setQuestionData(sortedQuestions);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
@@ -47,7 +52,6 @@ const ApplicationDetail = () => {
     return question ? question.content : "질문을 찾을 수 없습니다.";
   };
 
-  // 선택한 옵션의 content 찾기
   const findChoiceContent = (questionId: number, choiceIds: number[]) => {
     const question = questionData.find((q) => q.questionId === questionId);
     if (!question || !question.choices) return "없음";
@@ -59,6 +63,14 @@ const ApplicationDetail = () => {
     return selectedChoices.length > 0 ? selectedChoices.join(", ") : "없음";
   };
 
+  const sortedAnswers = data?.answers
+    ? [...data.answers].sort((a, b) => {
+        const priorityA = questionData.find((q) => q.questionId === a.questionId)?.priority || 9999;
+        const priorityB = questionData.find((q) => q.questionId === b.questionId)?.priority || 9999;
+        return priorityA - priorityB;
+      })
+    : [];
+
   return (
     <div>
       <h1>지원서 상세</h1>
@@ -68,14 +80,15 @@ const ApplicationDetail = () => {
           <p><strong>이름:</strong> {data.name}</p>
           <p><strong>전공:</strong> {data.major}</p>
           <p><strong>전화번호:</strong> {data.phoneNumber}</p>
+          <p><strong>학번:</strong> {data.studentNumber}</p>
           <p><strong>이메일:</strong> {data.email}</p>
           <p><strong>트랙:</strong> {data.track}</p>
           <p><strong>업데이트 날짜:</strong> {new Date(data.updatedAt).toLocaleString()}</p>
 
           <h2>답변</h2>
-          {data.answers && data.answers.length > 0 ? (
+          {sortedAnswers.length > 0 ? (
             <ul>
-              {data.answers.map((answer: Answer) => (
+              {sortedAnswers.map((answer: Answer) => (
                 <li key={answer.questionId}>
                   <p><strong>질문:</strong> {findQuestionContent(answer.questionId)}</p>
                   <p><strong>답변 내용:</strong> {answer.content ?? "없음"}</p>
