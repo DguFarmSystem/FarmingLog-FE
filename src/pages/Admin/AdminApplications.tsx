@@ -1,16 +1,29 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApplications } from "../../hooks/useApplications";
 import { Application } from "../../types/application";
-import { Link } from "react-router-dom"; 
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 const AdminApplications = () => {
-  const [track, setTrack] = useState<string | undefined>(undefined);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const queryParams = new URLSearchParams(location.search);
+  const initialTrack = queryParams.get("track") || undefined;
+
+  const [track, setTrack] = useState<string | undefined>(initialTrack);
   const { data: applications, error, isLoading } = useApplications(track);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (track) {
+      params.set("track", track);
+    }
+    navigate({ search: params.toString() }, { replace: true });
+  }, [track, history]);
 
   if (isLoading) return <p>로딩 중...</p>;
   if (error) return <p>에러 발생: {(error as Error).message}</p>;
 
-  const applicationList = applications ?? []; 
+  const applicationList = applications ?? [];
 
   return (
     <div>
